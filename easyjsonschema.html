@@ -1,0 +1,212 @@
+<html>
+  
+  <head>
+    <title>easy-json-schema-demo</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.2.9/ace.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.2.9/mode-json.js"></script>
+    <script >
+      (function () {
+  function isPlainObject(obj) {
+    return obj ? typeof obj === 'object' && Object.getPrototypeOf(obj) === Object.prototype : false;
+  }
+
+  const supportType = ['string', 'number', 'array', 'object', 'boolean', 'integer'];
+
+  function getType(type) {
+    if (!type) type = 'string';
+    if (supportType.indexOf(type) !== -1) {
+      return type;
+    }
+    return typeof type;
+  }
+
+  function isSchema(object) {
+    if (supportType.indexOf(object.type) !== -1) {
+      return true;
+    }
+    return false;
+  }
+
+  function handleSchema(json, schema) {
+    Object.assign(schema, json);
+    if (schema.type === 'object') {
+      delete schema.properties;
+      parse(json.properties, schema);
+    }
+    if (schema.type === 'array') {
+      delete schema.items;
+      schema.items = {};
+      parse(json.items, schema.items)
+    }
+
+  }
+
+  function handleArray(arr, schema) {
+    schema.type = 'array';
+    var props = schema.items = {};
+    parse(arr[0], props)
+  }
+
+  function handleObject(json, schema) {
+    if (isSchema(json)) {
+      return handleSchema(json, schema)
+    }
+    schema.type = 'object';
+    schema.required = [];
+    var props = schema.properties = {};
+    for (var key in json) {
+      var item = json[key];
+      var curSchema = props[key] = {};
+      if (key[0] === '*') {
+        delete props[key];
+        key = key.substr(1);
+        schema.required.push(key);
+        curSchema = props[key] = {};
+
+      }
+      parse(item, curSchema)
+    }
+  }
+
+  function parse(json, schema) {
+    if (Array.isArray(json)) {
+      handleArray(json, schema)
+    } else if (isPlainObject(json)) {
+      handleObject(json, schema)
+    } else {
+      schema.type = getType(json)
+    }
+  }
+
+  function ejs(data) {
+    var JsonSchema = {};
+    parse(data, JsonSchema);
+    return JsonSchema;
+  }
+
+  if(typeof module !== 'undefined' && typeof module === 'object' && module.exports !== 'undefined'){
+    module.exports = ejs;
+  }
+
+  if(typeof window !== 'undefined' && typeof window === 'object'){
+    window.easyJsonSchema = ejs;
+  }
+  
+})()
+    </script>
+    <style>
+      .run{
+        width: 50px;
+        height: 35px;
+        margin: 20px;
+        background: #ebf45d;
+      }
+      .textarea{
+        display: inline-block;
+        width: 500px;
+        height: 1200px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <button class="run" id="run">Run</button>
+    <select id="select">
+      <option>base</option>
+      <option>advance</option>
+    </select>
+    <div>
+      <div class="textarea" id="text-area1"></div>
+      <div readonly class="textarea" id="text-area2"></div>
+    </div>
+
+    <script>  
+      var demoData = {
+        base: {
+          "id": "uk123",
+          "*name": "tom",
+          "*email": "tom@gmail.com",
+          "arr": [{
+            "site": "string",
+            "url": "string"
+          }]
+        },
+
+        advance: {
+            "*id": "string",
+            "*name": {
+              "type": "string",
+              "enum": [
+                "tom",
+                "jay"
+              ],
+              "minLength": 1,
+              "maxLength": 10
+            },
+            "*images": [
+              {
+                "*id": "number",
+                "names": {
+                  "type": "array",
+                  "title": "Images Collections.",
+                  "items": {
+                    "*id": "string",
+                    "*name": "string"
+                  }
+                }
+              }
+            ],
+            "abc": {
+              "a": {
+                "x": "string",
+                "y": {
+                  "type": "number",
+                  "minimum": 400000,
+                  "maximum": 900000
+                }
+              }
+            }
+          }
+      }
+    
+      function loadEditor(container, readonly){
+        var editor = ace.edit(container);
+        editor.getSession().setMode("ace/mode/json");
+        if(readonly){
+          editor.setReadOnly(true)
+          editor.renderer.$cursorLayer.element.style.display = "none"
+        }
+        return editor;
+      }
+
+      var editor1 = loadEditor("text-area1");
+      editor1.setValue(JSON.stringify(demoData.base, null, 2));
+      editor1.clearSelection();
+      var editor2 = loadEditor("text-area2", true);
+
+      function run(){
+        var text1 = editor1.getValue();
+        var json;
+        try{
+          json = JSON.parse(text1);
+          var result = easyJsonSchema(json);
+          result = JSON.stringify(result, null, 2);
+          editor2.setValue(result);
+        }catch(err){
+          alert('Json format is error.')
+        }
+      }
+
+      document.getElementById('select').onchange = function(){
+        editor1.setValue(JSON.stringify(demoData[this.value], null, 2));
+        editor1.clearSelection();
+        run();
+      }
+
+      run();
+
+      document.getElementById('run').onclick = run;
+
+    </script>
+  </body>
+</html>
